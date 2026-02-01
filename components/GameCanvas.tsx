@@ -17,10 +17,18 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
   const dropXRef = useRef<number>(GAME_WIDTH / 2);
   const isDraggingRef = useRef<boolean>(false);
   const gameOverCalledRef = useRef<boolean>(false);
-  
-  // Coin görsellerini cache'lemek için
+  const nextLevelRef = useRef<number>(1); // Sonraki coin preview için
+
   const coinImagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
   const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  // Sonraki coin'i önceden belirleme (preview için)
+  const pickNextLevel = useCallback(() => {
+    const rand = Math.random();
+    if (rand < 0.6) return 1;
+    if (rand < 0.9) return 2;
+    return 3;
+  }, []);
 
   // Coin görsellerini yükle
   useEffect(() => {
@@ -29,7 +37,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
       const loadPromises = levels.map((level) => {
         const coinData = getCoinByLevel(level);
         if (!coinData) return Promise.resolve();
-        
+
         return new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => {
@@ -38,16 +46,16 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
           };
           img.onerror = () => {
             console.warn(`Failed to load image for level ${level}`);
-            resolve(); // Hata olsa da devam et
+            resolve();
           };
           img.src = coinData.iconUrl;
         });
       });
-      
+
       await Promise.all(loadPromises);
       setImagesLoaded(true);
     };
-    
+
     loadImages();
   }, []);
 
@@ -58,21 +66,18 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
     const img = coinImagesRef.current.get(level);
     const radius = coinData.radius;
 
-    // Eğer görsel yüklendiyse onu çiz, yoksa fallback
     if (img && img.complete) {
-      // Görseli daire içinde keserek çiz (clip)
       ctx.save();
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      
-      // Görseli coin boyutuna göre çiz
+
       const size = radius * 2;
       ctx.drawImage(img, x - radius, y - radius, size, size);
       ctx.restore();
-      
-      // Glow efekti (görselin üzerine)
+
+      // Glow
       ctx.shadowColor = coinData.glowColor;
       ctx.shadowBlur = 8;
       ctx.beginPath();
@@ -82,7 +87,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
       ctx.stroke();
       ctx.shadowBlur = 0;
     } else {
-      // Fallback: Eski yöntem (daire + yazı)
+      // Fallback
       ctx.shadowColor = coinData.glowColor;
       ctx.shadowBlur = 12;
       ctx.beginPath();
@@ -91,14 +96,12 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Border
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(255,255,255,0.3)";
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Symbol text
       ctx.fillStyle = "#fff";
       ctx.font = `bold ${Math.max(10, radius * 0.55)}px sans-serif`;
       ctx.textAlign = "center";
@@ -107,13 +110,14 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
     }
   }, [imagesLoaded]);
 
+  // Preview — sonraki coin gösterir
   const drawPreview = useCallback((ctx: CanvasRenderingContext2D) => {
-    const coinData = getCoinByLevel(1);
+    const coinData = getCoinByLevel(nextLevelRef.current);
     if (!coinData) return;
 
     const x = Math.max(coinData.radius, Math.min(GAME_WIDTH - coinData.radius, dropXRef.current));
 
-    // Dashed line guide
+    // Dashed guide line
     ctx.beginPath();
     ctx.setLineDash([5, 5]);
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
@@ -125,7 +129,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
 
     // Preview coin (yarı şeffaf)
     ctx.globalAlpha = 0.5;
-    drawCoin(ctx, x, coinData.radius, 1);
+    drawCoin(ctx, x, coinData.radius, nextLevelRef.current);
     ctx.globalAlpha = 1;
   }, [drawCoin]);
 
@@ -139,7 +143,6 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
 
     engine.update();
 
-    // Game over kontrolü
     if (engine.isGameOver && !gameOverCalledRef.current) {
       gameOverCalledRef.current = true;
       onGameOver(engine.mergeCount, engine.highestLevel);
@@ -149,7 +152,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
     // Clear
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Background (responsive olması için gradient eklenebilir ama şimdilik sabit)
+    // Background
     ctx.fillStyle = "#111827";
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
@@ -168,7 +171,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
       drawPreview(ctx);
     }
 
-    // Coins çiz
+    // Coins
     for (const coin of engine.coins) {
       drawCoin(ctx, coin.body.position.x, coin.body.position.y, coin.level);
     }
@@ -176,7 +179,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
     animFrameRef.current = requestAnimationFrame(gameLoop);
   }, [drawCoin, drawPreview, onGameOver]);
 
-  // Touch & mouse handlers (değişmedi)
+  // Touch & mouse handlers
   const getX = useCallback((e: React.TouchEvent | React.MouseEvent): number => {
     const canvas = canvasRef.current;
     if (!canvas) return GAME_WIDTH / 2;
@@ -212,8 +215,10 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
 
     if (engineRef.current && !engineRef.current.isGameOver) {
       engineRef.current.addCoin(dropXRef.current);
+      // Coin düştükten sonra sonraki preview güncelle
+      nextLevelRef.current = pickNextLevel();
     }
-  }, []);
+  }, [pickNextLevel]);
 
   // Keyboard handlers
   useEffect(() => {
@@ -232,19 +237,21 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
         e.preventDefault();
         if (engineRef.current) {
           engineRef.current.addCoin(dropXRef.current);
+          nextLevelRef.current = pickNextLevel();
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [gameStarted]);
+  }, [gameStarted, pickNextLevel]);
 
   // Engine init & loop
   useEffect(() => {
     if (!gameStarted) return;
 
     gameOverCalledRef.current = false;
+    nextLevelRef.current = pickNextLevel();
     engineRef.current = createPhysicsEngine(onMerge);
     animFrameRef.current = requestAnimationFrame(gameLoop);
 
@@ -253,7 +260,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
       engineRef.current?.destroy();
       engineRef.current = null;
     };
-  }, [gameStarted, onMerge, gameLoop]);
+  }, [gameStarted, onMerge, gameLoop, pickNextLevel]);
 
   return (
     <canvas
@@ -261,11 +268,11 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
       width={GAME_WIDTH}
       height={GAME_HEIGHT}
       className="rounded-xl border border-gray-800 cursor-pointer"
-      style={{ 
-        maxWidth: "100%", 
+      style={{
+        maxWidth: "100%",
         height: "auto",
         display: "block",
-        margin: "0 auto"
+        margin: "0 auto",
       }}
       onTouchStart={handleStart}
       onTouchMove={handleMove}
