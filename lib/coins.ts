@@ -6,6 +6,7 @@ export interface CoinType {
   color: string;
   glowColor: string;
   scoreValue: number;
+  iconUrl: string; // YENİ: Coin görselinin yolu
 }
 
 export const COINS: CoinType[] = [
@@ -17,6 +18,7 @@ export const COINS: CoinType[] = [
     color: "#C3A634",
     glowColor: "#C3A63488",
     scoreValue: 1,
+    iconUrl: "/coins/DOGE-LOGO.jpg", // GitHub'daki dosya adı
   },
   {
     level: 2,
@@ -26,15 +28,17 @@ export const COINS: CoinType[] = [
     color: "#FFA500",
     glowColor: "#FFA50088",
     scoreValue: 2,
+    iconUrl: "/coins/SHIP-LOGO.png", // GitHub'daki dosya adı (SHIP olarak yüklenmiş)
   },
   {
     level: 3,
     name: "Sponsor",
-    symbol: "SPO",
+    symbol: "SPONSOR",
     radius: 30,
     color: "#FF6B6B",
     glowColor: "#FF6B6B88",
     scoreValue: 4,
+    iconUrl: "/coins/SPONSOR.png", // Bu dosyayı sen eklemelisin (üzerinde SPONSOR yazan basit bir PNG)
   },
   {
     level: 4,
@@ -44,6 +48,7 @@ export const COINS: CoinType[] = [
     color: "#00C853",
     glowColor: "#00C85388",
     scoreValue: 8,
+    iconUrl: "/coins/PEPE-LOGO.png",
   },
   {
     level: 5,
@@ -53,6 +58,7 @@ export const COINS: CoinType[] = [
     color: "#9945FF",
     glowColor: "#9945FF88",
     scoreValue: 16,
+    iconUrl: "/coins/SOL-LOGO.png",
   },
   {
     level: 6,
@@ -62,6 +68,7 @@ export const COINS: CoinType[] = [
     color: "#627EEA",
     glowColor: "#627EEA88",
     scoreValue: 32,
+    iconUrl: "/coins/ETH-LOGO.png",
   },
   {
     level: 7,
@@ -71,6 +78,7 @@ export const COINS: CoinType[] = [
     color: "#F7931A",
     glowColor: "#F7931A88",
     scoreValue: 64,
+    iconUrl: "/coins/BTC-LOGO.png",
   },
 ];
 
