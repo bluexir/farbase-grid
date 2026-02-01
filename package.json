@@ -8,6 +8,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@farcaster/miniapp-sdk": "latest",
     "autoprefixer": "^10.4.19",
     "next": "^14.2.20",
     "postcss": "^8.4.38",
