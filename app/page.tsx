@@ -5,12 +5,15 @@ import { sdk } from "@farcaster/miniapp-sdk";
 import GameCanvas from "@/components/GameCanvas";
 import Scoreboard from "@/components/Scoreboard";
 import GameOver from "@/components/GameOver";
+import MainMenu from "@/components/MainMenu";
 import { getCoinByLevel } from "@/lib/coins";
+
+type Screen = "menu" | "practice" | "tournament" | "leaderboard";
 
 export default function Home() {
   const [fid, setFid] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [gameStarted, setGameStarted] = useState(false);
+  const [screen, setScreen] = useState<Screen>("menu");
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [mergeCount, setMergeCount] = useState(0);
@@ -41,76 +44,196 @@ export default function Home() {
     setHighestLevel(finalHighest);
   }, []);
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback((mode: "practice" | "tournament") => {
     setGameOver(false);
     setScore(0);
     setMergeCount(0);
     setHighestLevel(1);
-    setGameStarted(true);
+    setScreen(mode);
     setGameKey((prev) => prev + 1);
   }, []);
 
   const restartGame = useCallback(() => {
-    setGameStarted(false);
-    setTimeout(() => {
-      startGame();
-    }, 100);
-  }, [startGame]);
+    setGameOver(false);
+    setScore(0);
+    setMergeCount(0);
+    setHighestLevel(1);
+    setGameKey((prev) => prev + 1);
+  }, []);
 
-  // Live score hesap
   const liveScore = (getCoinByLevel(highestLevel)?.scoreValue || 1) * mergeCount;
 
+  // Loading
   if (loading) {
     return (
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-yellow-400">FarBase Drop</h1>
-        <p className="text-gray-400 mt-2">Loading...</p>
+      <div
+        style={{
+          height: "100vh",
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "radial-gradient(circle at center, #0a0a1a 0%, #000 100%)",
+        }}
+      >
+        <h1
+          style={{
+            fontSize: "2rem",
+            fontWeight: "bold",
+            color: "#00f3ff",
+            textShadow: "0 0 20px #00f3ff",
+          }}
+        >
+          FarBase Drop
+        </h1>
+        <p style={{ color: "#555", marginTop: "8px" }}>Loading...</p>
       </div>
     );
   }
 
-  // Ana menu (oyun başlatılmadan önce)
-  if (!gameStarted) {
+  // Ana Menü
+  if (screen === "menu") {
     return (
-      <div className="w-full max-w-sm mx-auto flex flex-col items-center px-4 py-8">
-        <h1 className="text-4xl font-bold text-yellow-400 mb-2">FarBase Drop</h1>
-        <p className="text-gray-500 text-sm mb-8 text-center">
-          Coinleri birleştir, skor yaz
-        </p>
+      <MainMenu
+        fid={fid!}
+        onPractice={() => startGame("practice")}
+        onTournament={() => startGame("tournament")}
+        onLeaderboard={() => setScreen("leaderboard")}
+      />
+    );
+  }
 
-        <div className="w-full bg-gray-800 rounded-lg p-4 mb-6">
-          <p className="text-gray-400 text-sm text-center mb-3">How to Play</p>
-          <div className="space-y-2 text-gray-300 text-sm">
-            <p>🤚 Drag left/right to position the coin</p>
-            <p>👆 Release to drop</p>
-            <p>🔗 Match two same coins to merge</p>
-            <p>📈 DOGE → SHIB → SPO → PEPE → SOL → ETH → BTC</p>
-          </div>
+  // Leaderboard (şimdilik placeholder)
+  if (screen === "leaderboard") {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          width: "100%",
+          background: "radial-gradient(circle at center, #0a0a1a 0%, #000 100%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "32px 24px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            width: "100%",
+            maxWidth: "340px",
+            marginBottom: "24px",
+          }}
+        >
+          <button
+            onClick={() => setScreen("menu")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#00f3ff",
+              fontSize: "0.85rem",
+              cursor: "pointer",
+            }}
+          >
+            ← Back
+          </button>
+          <span
+            style={{
+              color: "#fff",
+              fontWeight: "bold",
+              fontSize: "1.1rem",
+            }}
+          >
+            📊 Leaderboard
+          </span>
+          <div style={{ width: "60px" }} />
         </div>
 
-        <button
-          onClick={startGame}
-          className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 rounded-lg text-lg transition-colors"
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "340px",
+            background: "rgba(255,255,255,0.05)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid #333",
+            borderRadius: "16px",
+            padding: "24px",
+            textAlign: "center",
+          }}
         >
-          Play
-        </button>
-
-        <p className="text-gray-600 text-xs mt-4">FID: {fid}</p>
+          <p style={{ color: "#555", fontSize: "0.85rem" }}>
+            No scores yet. Play a game first!
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Oyun ekranı
+  // Oyun Ekranı (practice veya tournament)
   return (
-    <div className="w-full max-w-sm mx-auto flex flex-col items-center px-2">
-      <Scoreboard score={liveScore} mergeCount={mergeCount} highestLevel={highestLevel} />
+    <div
+      style={{
+        height: "100vh",
+        width: "100%",
+        background: "#000",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        overflow: "hidden",
+      }}
+    >
+      {/* Top bar */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "360px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px 12px 0 12px",
+        }}
+      >
+        <button
+          onClick={() => setScreen("menu")}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#00f3ff",
+            fontSize: "0.75rem",
+            cursor: "pointer",
+          }}
+        >
+          ← Menu
+        </button>
+        <span
+          style={{
+            color: screen === "tournament" ? "#ff00ff" : "#00f3ff",
+            fontSize: "0.7rem",
+            fontWeight: "bold",
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+          }}
+        >
+          {screen === "tournament" ? "🏆 Tournament" : "🎮 Practice"}
+        </span>
+        <div style={{ width: "50px" }} />
+      </div>
 
-      <div className="relative w-full">
+      {/* Scoreboard */}
+      <div style={{ width: "100%", maxWidth: "360px" }}>
+        <Scoreboard score={liveScore} mergeCount={mergeCount} highestLevel={highestLevel} />
+      </div>
+
+      {/* Game Canvas */}
+      <div style={{ position: "relative", width: "360px", flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
         <GameCanvas
           key={gameKey}
           onMerge={handleMerge}
           onGameOver={handleGameOver}
-          gameStarted={gameStarted}
+          gameStarted={true}
         />
 
         {gameOver && (
