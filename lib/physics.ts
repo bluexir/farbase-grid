@@ -180,7 +180,7 @@ export function createPhysicsEngine(
   }
 
   function destroy() {
-    Engine.clear(engine, false);
+   Engine.clear(engine);
   }
 
   return {
