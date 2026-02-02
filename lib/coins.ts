@@ -29,7 +29,7 @@ export const COINS: CoinType[] = [
     color: "#FFA500",
     glowColor: "#FFA50088",
     scoreValue: 2,
-    iconUrl: "/shib-logo.png", // Burayı kontrol et: shib-logo.png olmalı
+    iconUrl: "/shıb-logo.png", // Burayı kontrol et: shib-logo.png olmalı
   },
   {
     level: 3,
