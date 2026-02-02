@@ -7,7 +7,7 @@ export interface CoinType {
   glowColor: string;
   scoreValue: number;
   iconUrl: string;
-  isSponsor?: boolean; // Sponsoru ayırt etmek için ekledik
+  isSponsor?: boolean;
 }
 
 export const COINS: CoinType[] = [
@@ -19,7 +19,7 @@ export const COINS: CoinType[] = [
     color: "#C3A634",
     glowColor: "#C3A63488",
     scoreValue: 1,
-    iconUrl: "/doge-logo.jpg", // Küçük harf ve doğrudan dizin
+    iconUrl: "/doge-logo.jpg",
   },
   {
     level: 2,
@@ -39,7 +39,7 @@ export const COINS: CoinType[] = [
     color: "#FF6B6B",
     glowColor: "#FF6B6B88",
     scoreValue: 4,
-    iconUrl: "", // Sponsor için görsel kullanmayacağız
+    iconUrl: "", // Sponsor için görsel yok, sadece yazı çıkacak
     isSponsor: true,
   },
   {
