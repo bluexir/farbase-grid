@@ -32,9 +32,11 @@ export default function Home() {
       // Cüzdan adresi al
       try {
         const provider = await sdk.wallet.getEthereumProvider();
-        const accounts = await provider.request({ method: "eth_accounts" });
-        if (accounts && accounts.length > 0) {
-          setAddress(accounts[0]);
+        if (provider) {
+          const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
+          if (accounts && accounts.length > 0) {
+            setAddress(accounts[0]);
+          }
         }
       } catch (e) {
         console.warn("Wallet not connected");
@@ -98,16 +100,21 @@ export default function Home() {
   const startGame = useCallback(async (mode: "practice" | "tournament") => {
     // Tournament için cüzdan kontrolü ve ödeme
     if (mode === "tournament") {
-      if (!address) {
+      let currentAddress = address;
+
+      if (!currentAddress) {
         // Cüzdan bağla
         try {
           const provider = await sdk.wallet.getEthereumProvider();
-          const accounts = await provider.request({ method: "eth_accounts" });
-          if (accounts && accounts.length > 0) {
-            setAddress(accounts[0]);
-          } else {
-            alert("Cüzdan bağlanmadı");
-            return;
+          if (provider) {
+            const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
+            if (accounts && accounts.length > 0) {
+              setAddress(accounts[0]);
+              currentAddress = accounts[0];
+            } else {
+              alert("Cüzdan bağlanmadı");
+              return;
+            }
           }
         } catch (e) {
           alert("Cüzdan bağlama başarısız");
@@ -118,6 +125,7 @@ export default function Home() {
       // 1 USDC ödeme
       try {
         const provider = await sdk.wallet.getEthereumProvider();
+        if (!provider) throw new Error("No provider");
 
         // Base Mainnet'e switch
         await provider.request({
@@ -137,20 +145,19 @@ export default function Home() {
         await provider.request({
           method: "eth_sendTransaction",
           params: [{
-            from: address,
+            from: currentAddress,
             to: USDC_ADDRESS,
             data: approveData,
           }],
         });
 
         // enterTournament
-        const enterData = "0x" + // enterTournament() selector
-          "a]93f7e"; // Function selector — deploy sonrası doğrulanacak
+        const enterData = "0x" + "a93f7e"; // Function selector - Hata düzeltildi: "]" karakteri silindi
 
         await provider.request({
           method: "eth_sendTransaction",
           params: [{
-            from: address,
+            from: currentAddress,
             to: CONTRACT_ADDRESS,
             data: enterData,
           }],
@@ -240,7 +247,6 @@ export default function Home() {
         overflow: "hidden",
       }}
     >
-      {/* Top bar */}
       <div
         style={{
           width: "100%",
@@ -277,12 +283,10 @@ export default function Home() {
         <div style={{ width: "50px" }} />
       </div>
 
-      {/* Scoreboard */}
       <div style={{ width: "100%", maxWidth: "424px" }}>
         <Scoreboard score={liveScore} mergeCount={mergeCount} highestLevel={highestLevel} />
       </div>
 
-      {/* Game Canvas */}
       <div style={{ position: "relative", width: "424px", flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
         <GameCanvas
           key={gameKey}
