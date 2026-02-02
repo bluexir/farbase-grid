@@ -29,7 +29,6 @@ export default function Home() {
       const context = await sdk.context;
       setFid(context.user.fid);
 
-      // Cüzdan adresi al
       try {
         const provider = await sdk.wallet.getEthereumProvider();
         if (provider) {
@@ -62,7 +61,6 @@ export default function Home() {
     setHighestLevel(finalHighest);
     setScoreSaved(false);
 
-    // Score API'ye kaydet
     try {
       await fetch("/api/save-score", {
         method: "POST",
@@ -82,11 +80,11 @@ export default function Home() {
     }
   }, [fid, address, currentMode]);
 
-  // Cast paylaşım
+  // Cast Paylaşımı (İngilizce olarak güncellendi)
   const handleCast = useCallback(async () => {
     try {
       const coinData = getCoinByLevel(highestLevel);
-      const text = `🪙 FarBase Drop'ta ${score} puan kazandım! En yüksek coin: ${coinData?.symbol || "DOGE"} 🔥\n\nOyna: https://farbase-drop.vercel.app`;
+      const text = `🪙 I just scored ${score} points on FarBase Drop! My highest coin reached: ${coinData?.symbol || "DOGE"} 🔥\n\nPlay now: https://farbase-drop.vercel.app`;
       
       await sdk.actions.composeCast({
         text,
@@ -98,12 +96,10 @@ export default function Home() {
   }, [score, highestLevel]);
 
   const startGame = useCallback(async (mode: "practice" | "tournament") => {
-    // Tournament için cüzdan kontrolü ve ödeme
     if (mode === "tournament") {
       let currentAddress = address;
 
       if (!currentAddress) {
-        // Cüzdan bağla
         try {
           const provider = await sdk.wallet.getEthereumProvider();
           if (provider) {
@@ -112,35 +108,31 @@ export default function Home() {
               setAddress(accounts[0]);
               currentAddress = accounts[0];
             } else {
-              alert("Cüzdan bağlanmadı");
+              alert("Wallet not connected");
               return;
             }
           }
         } catch (e) {
-          alert("Cüzdan bağlama başarısız");
+          alert("Wallet connection failed");
           return;
         }
       }
 
-      // 1 USDC ödeme
       try {
         const provider = await sdk.wallet.getEthereumProvider();
         if (!provider) throw new Error("No provider");
 
-        // Base Mainnet'e switch
         await provider.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }], // Base Mainnet
+          params: [{ chainId: "0x2105" }], 
         });
 
-        // USDC approve + enterTournament
-        const USDC_ADDRESS = "0x833589fCD6e678d9Ab702236158911Df7a60662E"; // Base Mainnet USDC
+        const USDC_ADDRESS = "0x833589fCD6e678d9Ab702236158911Df7a60662E";
         const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
 
-        // approve
-        const approveData = "0x095ea7b3" + // approve(address,uint256)
+        const approveData = "0x095ea7b3" + 
           CONTRACT_ADDRESS.slice(2).padStart(64, "0") +
-          (1000000).toString(16).padStart(64, "0"); // 1 USDC = 1e6
+          (1000000).toString(16).padStart(64, "0"); 
 
         await provider.request({
           method: "eth_sendTransaction",
@@ -151,8 +143,7 @@ export default function Home() {
           }],
         });
 
-        // enterTournament
-        const enterData = "0x" + "a93f7e"; // Function selector - Hata düzeltildi: "]" karakteri silindi
+        const enterData = "0x" + "a93f7e"; 
 
         await provider.request({
           method: "eth_sendTransaction",
@@ -164,7 +155,7 @@ export default function Home() {
         });
       } catch (e) {
         console.error("Tournament entry failed:", e);
-        alert("Ödeme başarısız");
+        alert("Transaction failed");
         return;
       }
     }
@@ -188,7 +179,6 @@ export default function Home() {
 
   const liveScore = (getCoinByLevel(highestLevel)?.scoreValue || 1) * mergeCount;
 
-  // Loading
   if (loading) {
     return (
       <div
@@ -217,7 +207,6 @@ export default function Home() {
     );
   }
 
-  // Ana Menü
   if (screen === "menu") {
     return (
       <MainMenu
@@ -229,12 +218,10 @@ export default function Home() {
     );
   }
 
-  // Leaderboard
   if (screen === "leaderboard") {
     return <Leaderboard onBack={() => setScreen("menu")} />;
   }
 
-  // Oyun Ekranı
   return (
     <div
       style={{
