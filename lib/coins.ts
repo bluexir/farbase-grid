@@ -19,7 +19,7 @@ export const COINS: CoinType[] = [
     color: "#C3A634",
     glowColor: "#C3A63488",
     scoreValue: 1,
-    iconUrl: "/farbase-logo.png",
+    iconUrl: "/doge-logo.jpg",
   },
   {
     level: 2,
@@ -90,7 +90,7 @@ export const COINS: CoinType[] = [
     color: "#0052FF",
     glowColor: "#0052FF88",
     scoreValue: 128,
-    iconUrl: "/doge-logo.jpg"
+    iconUrl: "/farbase-logo.png",
   },
 ];
 
