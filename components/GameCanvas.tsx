@@ -31,7 +31,7 @@ export default function GameCanvas({ onMerge, onGameOver, gameStarted }: GameCan
 
   useEffect(() => {
     const loadImages = async () => {
-      const levels = Array.from({ length: 7 }, (_, i) => i + 1);
+      const levels = Array.from({ length: 8 }, (_, i) => i + 1);
       const loadPromises = levels.map((level) => {
         const coinData = getCoinByLevel(level);
         if (!coinData || !coinData.iconUrl) return Promise.resolve();
