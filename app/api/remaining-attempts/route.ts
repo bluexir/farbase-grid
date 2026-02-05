@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRemainingAttempts } from "@/lib/attempts";
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,14 +24,12 @@ export async function GET(req: NextRequest) {
     let remaining = 0;
 
     if (mode === "practice") {
-      // Practice: Günlük 3 deneme
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split("T")[0];
       const dailyKey = `practice:daily:${fid}:${today}`;
       
-      const used = await kv.get<number>(dailyKey) || 0;
+      const used = await redis.get<number>(dailyKey) || 0;
       remaining = Math.max(0, 3 - used);
     } else {
-      // Tournament: Entry bazlı takip
       remaining = await getRemainingAttempts(parseInt(fid), mode);
     }
 
