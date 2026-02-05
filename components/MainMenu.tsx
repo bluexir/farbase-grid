@@ -12,6 +12,8 @@ interface MainMenuProps {
 export default function MainMenu({ fid, onPractice, onTournament, onLeaderboard }: MainMenuProps) {
   const [prizePool, setPrizePool] = useState<string>("0");
   const [recommendedApps, setRecommendedApps] = useState<any[]>([]);
+  const [practiceAttempts, setPracticeAttempts] = useState<number>(3);
+  const [tournamentAttempts, setTournamentAttempts] = useState<number>(0);
 
   useEffect(() => {
     async function fetchPrizePool() {
@@ -34,9 +36,26 @@ export default function MainMenu({ fid, onPractice, onTournament, onLeaderboard 
       }
     }
 
+    async function fetchAttempts() {
+      try {
+        // Practice attempts
+        const practiceRes = await fetch(`/api/remaining-attempts?fid=${fid}&mode=practice`);
+        const practiceData = await practiceRes.json();
+        setPracticeAttempts(practiceData.remaining || 0);
+
+        // Tournament attempts
+        const tournamentRes = await fetch(`/api/remaining-attempts?fid=${fid}&mode=tournament`);
+        const tournamentData = await tournamentRes.json();
+        setTournamentAttempts(tournamentData.remaining || 0);
+      } catch (e) {
+        console.error("Failed to fetch attempts:", e);
+      }
+    }
+
     fetchPrizePool();
     fetchRecommendedApps();
-  }, []);
+    fetchAttempts();
+  }, [fid]);
 
   return (
     <div
@@ -87,19 +106,22 @@ export default function MainMenu({ fid, onPractice, onTournament, onLeaderboard 
       >
         {/* Practice */}
         <div
-          onClick={onPractice}
+          onClick={practiceAttempts > 0 ? onPractice : undefined}
           style={{
             background: 'rgba(255,255,255,0.05)',
             backdropFilter: 'blur(12px)',
             border: '1px solid #00f3ff',
             borderRadius: '16px',
             padding: '20px',
-            cursor: 'pointer',
+            cursor: practiceAttempts > 0 ? 'pointer' : 'not-allowed',
+            opacity: practiceAttempts > 0 ? 1 : 0.5,
             transition: 'box-shadow 0.2s ease, transform 0.2s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 0 20px #00f3ff44';
-            e.currentTarget.style.transform = 'translateY(-2px)';
+            if (practiceAttempts > 0) {
+              e.currentTarget.style.boxShadow = '0 0 20px #00f3ff44';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.boxShadow = 'none';
@@ -117,15 +139,15 @@ export default function MainMenu({ fid, onPractice, onTournament, onLeaderboard 
             <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#00f3ff' }}>🎮 Practice</span>
             <span
               style={{
-                background: '#fff',
-                color: '#000',
+                background: practiceAttempts > 0 ? '#fff' : '#555',
+                color: practiceAttempts > 0 ? '#000' : '#999',
                 fontSize: '0.7rem',
                 fontWeight: 'bold',
                 padding: '2px 8px',
                 borderRadius: '12px',
               }}
             >
-              3/3
+              {practiceAttempts}/3
             </span>
           </div>
           <p style={{ color: '#666', fontSize: '0.75rem', margin: 0 }}>Daily free attempts • Same seed • No rewards</p>
@@ -163,18 +185,18 @@ export default function MainMenu({ fid, onPractice, onTournament, onLeaderboard 
             <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#ff00ff' }}>🏆 Tournament</span>
             <span
               style={{
-                background: '#fff',
-                color: '#000',
+                background: tournamentAttempts > 0 ? '#fff' : '#555',
+                color: tournamentAttempts > 0 ? '#000' : '#999',
                 fontSize: '0.7rem',
                 fontWeight: 'bold',
                 padding: '2px 8px',
                 borderRadius: '12px',
               }}
             >
-              3/3
+              {tournamentAttempts}/3
             </span>
           </div>
-          <p style={{ color: '#666', fontSize: '0.75rem', margin: 0 }}>1 USDC Entry • Top 5 Win • Daily 3 attempts</p>
+          <p style={{ color: '#666', fontSize: '0.75rem', margin: 0 }}>1 USDC Entry • Top 5 Win • 3 attempts per entry</p>
         </div>
 
         {/* Leaderboard */}
@@ -240,7 +262,7 @@ export default function MainMenu({ fid, onPractice, onTournament, onLeaderboard 
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {recommendedApps.map((app, index) => (
-                <a
+                
                   key={index}
                   href={app.url}
                   target="_blank"
