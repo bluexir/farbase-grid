@@ -1,22 +1,24 @@
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
 
 /**
  * Attempt tracking sistemi
  * Her 1 USDC ödeme = 3 deneme hakkı
- * Entry bazlı takip (günlük değil)
+ * Entry bazlı takip
  */
 
 interface AttemptEntry {
   fid: number;
   address: string;
   entryTimestamp: number;
-  attemptsUsed: number; // 0-3 arası
+  attemptsUsed: number;
   mode: "practice" | "tournament";
 }
 
-/**
- * Yeni entry oluştur (1 USDC ödendi, 3 deneme hakkı verildi)
- */
 export async function createNewEntry(
   fid: number,
   address: string,
@@ -31,71 +33,65 @@ export async function createNewEntry(
     mode,
   };
   
-  await kv.set(entryId, entry);
-  
-  // Aktif entry olarak işaretle
-  await kv.set(`${mode}:active:${fid}`, entryId);
+  await redis.set(entryId, JSON.stringify(entry));
+  await redis.set(`${mode}:active:${fid}`, entryId);
   
   return entryId;
 }
 
-/**
- * Aktif entry'deki kalan deneme hakkını getir
- */
 export async function getRemainingAttempts(
   fid: number,
   mode: "practice" | "tournament"
 ): Promise<number> {
-  const activeEntryId = await kv.get<string>(`${mode}:active:${fid}`);
+  const activeEntryId = await redis.get<string>(`${mode}:active:${fid}`);
   
   if (!activeEntryId) {
-    return 0; // Hiç entry yok
+    return 0;
   }
   
-  const entry = await kv.get<AttemptEntry>(activeEntryId);
+  const entryStr = await redis.get<string>(activeEntryId);
   
-  if (!entry) {
-    return 0; // Entry bulunamadı
+  if (!entryStr) {
+    return 0;
   }
   
+  const entry = typeof entryStr === 'string' ? JSON.parse(entryStr) : entryStr;
   const remaining = 3 - entry.attemptsUsed;
   return Math.max(0, remaining);
 }
 
-/**
- * Bir deneme hakkı kullan
- */
 export async function useAttempt(
   fid: number,
   mode: "practice" | "tournament"
 ): Promise<boolean> {
-  const activeEntryId = await kv.get<string>(`${mode}:active:${fid}`);
+  const activeEntryId = await redis.get<string>(`${mode}:active:${fid}`);
   
   if (!activeEntryId) {
-    return false; // Aktif entry yok
+    return false;
   }
   
-  const entry = await kv.get<AttemptEntry>(activeEntryId);
+  const entryStr = await redis.get<string>(activeEntryId);
   
-  if (!entry || entry.attemptsUsed >= 3) {
-    return false; // Entry yok veya tüm denemeler bitti
+  if (!entryStr) {
+    return false;
   }
   
-  // Deneme sayısını artır
-  entry.attemptsUsed += 1;
-  await kv.set(activeEntryId, entry);
+  const entry = typeof entryStr === 'string' ? JSON.parse(entryStr) : entryStr;
   
-  // Eğer tüm denemeler bittiyse aktif entry'yi sil
   if (entry.attemptsUsed >= 3) {
-    await kv.del(`${mode}:active:${fid}`);
+    return false;
+  }
+  
+  entry.attemptsUsed += 1;
+  await redis.set(activeEntryId, JSON.stringify(entry));
+  
+  if (entry.attemptsUsed >= 3) {
+    await redis.del(`${mode}:active:${fid}`);
   }
   
   return true;
 }
 
-/**
- * Aktif entry var mı kontrol et
- */
 export async function hasActiveEntry(
   fid: number,
   mode: "practice" | "tournament"
@@ -104,14 +100,11 @@ export async function hasActiveEntry(
   return remaining > 0;
 }
 
-/**
- * Toplam kaç entry yapılmış (istatistik için)
- */
 export async function getTotalEntries(
   fid: number,
   mode: "practice" | "tournament"
 ): Promise<number> {
   const pattern = `${mode}:entry:${fid}:*`;
-  const keys = await kv.keys(pattern);
+  const keys = await redis.keys(pattern);
   return keys.length;
 }
