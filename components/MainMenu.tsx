@@ -262,7 +262,7 @@ export default function MainMenu({ fid, onPractice, onTournament, onLeaderboard 
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {recommendedApps.map((app, index) => (
-                
+                <a
                   key={index}
                   href={app.url}
                   target="_blank"
