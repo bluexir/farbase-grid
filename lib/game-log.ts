@@ -69,4 +69,44 @@ function getScoreValueByLevel(level: number): number {
   return values[level] || 1;
 }
 
-export function validateGame
+export function validateGameLog(log: GameLog): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!log.sessionId) errors.push('Missing sessionId');
+  if (!log.fid) errors.push('Missing fid');
+  if (!log.mode || !['practice', 'tournament'].includes(log.mode)) {
+    errors.push('Invalid mode');
+  }
+  if (!Array.isArray(log.events)) errors.push('Invalid events array');
+  if (log.events.length === 0) errors.push('Empty events');
+  
+  if (log.startTime && log.endTime) {
+    const duration = log.endTime - log.startTime;
+    if (duration > 30 * 60 * 1000) {
+      errors.push('Game duration too long');
+    }
+    if (duration < 5000) {
+      errors.push('Game duration too short');
+    }
+  }
+
+  let lastTimestamp = log.startTime;
+  for (const event of log.events) {
+    if (event.timestamp < lastTimestamp) {
+      errors.push('Event timestamp out of order');
+      break;
+    }
+    lastTimestamp = event.timestamp;
+    
+    if (event.type === 'DROP') {
+      if (typeof event.data.x !== 'number' || event.data.x < 0 || event.data.x > 424) {
+        errors.push('Invalid drop position');
+      }
+      if (!event.data.level || event.data.level < 1 || event.data.level > 3) {
+        errors.push('Invalid drop level');
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
