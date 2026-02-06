@@ -342,7 +342,7 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-black text-white">
       {!gameOver ? (
         <>
-          <Scoreboard score={liveScore} highestLevel={highestLevel} />
+         <Scoreboard score={liveScore} highestLevel={highestLevel} mergeCount={mergeCount} />
           <GameCanvas
             key={gameKey}
             mode={currentMode}
