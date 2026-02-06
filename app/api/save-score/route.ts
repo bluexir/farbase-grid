@@ -15,11 +15,10 @@ export async function POST(request: Request) {
       mergeCount, 
       highestLevel, 
       mode,
-      gameLog,        // Yeni: Oyun logları
-      sessionId       // Yeni: Oyun session ID
+      gameLog,
+      sessionId
     } = body;
 
-    // Temel validasyon
     if (!fid || !address || !mode || !sessionId) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -34,7 +33,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Game log validasyonu
     const logValidation = validateGameLog(gameLog as GameLog);
     if (!logValidation.valid) {
       console.error("Invalid game log:", logValidation.errors);
@@ -44,10 +42,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Skor doğrulama - Sunucuda yeniden hesapla
     const calculated = calculateScoreFromLog(gameLog as GameLog);
     
-    // Tolerans: ±5% (ağ gecikmesi vs. için)
     const scoreDiff = Math.abs(calculated.score - score);
     const scoreTolerance = score * 0.05;
     
@@ -63,7 +59,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Merge count ve highest level kontrolü
     if (calculated.mergeCount !== mergeCount || calculated.highestLevel !== highestLevel) {
       console.error("Stats mismatch:", {
         client: { mergeCount, highestLevel },
@@ -75,11 +70,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Skor kaydet
     const entry: LeaderboardEntry = {
       fid,
       address,
-      score: calculated.score, // Sunucu tarafından hesaplanan skor kullan
+      score: calculated.score,
       mergeCount: calculated.mergeCount,
       highestLevel: calculated.highestLevel,
       playedAt: Date.now(),
