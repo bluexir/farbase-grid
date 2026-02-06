@@ -1,4 +1,4 @@
-
+import { Redis } from "@upstash/redis";
 
 export interface LeaderboardEntry {
   fid: number;
@@ -19,13 +19,17 @@ export function getWeekNumber(): number {
   return diffWeeks + 1;
 }
 
-// Vercel KV key formatları:
-// tournament:week:{weekNumber}:{fid} → LeaderboardEntry
-// practice:week:{weekNumber}:{fid}  → LeaderboardEntry
+// Upstash Redis client (env'den)
+let _redis: Redis | null = null;
 
-async function getKV() {
-  const { kv } = await import("@vercel/kv");
-  return kv;
+function getRedis(): Redis {
+  if (_redis) return _redis;
+
+  // Redis.fromEnv() şu env'leri bekler:
+  // UPSTASH_REDIS_REST_URL
+  // UPSTASH_REDIS_REST_TOKEN
+  _redis = Redis.fromEnv();
+  return _redis;
 }
 
 // Score kaydet
@@ -33,55 +37,53 @@ export async function saveScore(
   mode: "practice" | "tournament",
   entry: LeaderboardEntry
 ): Promise<void> {
-  const kv = await getKV();
+  const redis = getRedis();
   const weekNumber = getWeekNumber();
   const key = `${mode}:week:${weekNumber}:${entry.fid}`;
 
-  // Mevcut score kontrolü — sadece daha yüksek score kaydet
-  const existing = await kv.get<LeaderboardEntry>(key);
+  const existing = await redis.get<LeaderboardEntry>(key);
   if (existing && existing.score >= entry.score) {
-    return; // Mevcut score daha yüksek, kaydetme
+    return;
   }
 
-  await kv.set(key, entry);
+  await redis.set(key, entry);
 }
 
 // Belirli mod için bu hafta Top 5
 export async function getTop5(
   mode: "practice" | "tournament"
 ): Promise<LeaderboardEntry[]> {
-  const kv = await getKV();
+  const redis = getRedis();
   const weekNumber = getWeekNumber();
   const pattern = `${mode}:week:${weekNumber}:*`;
 
-  const keys = await kv.keys(pattern);
-  if (keys.length === 0) return [];
+  const keys = await redis.keys<string>(pattern);
+  if (!keys || keys.length === 0) return [];
 
   const entries: LeaderboardEntry[] = [];
   for (const key of keys) {
-    const entry = await kv.get<LeaderboardEntry>(key);
+    const entry = await redis.get<LeaderboardEntry>(key);
     if (entry) entries.push(entry);
   }
 
-  // Score göre azalan sıra, Top 5
   entries.sort((a, b) => b.score - a.score);
   return entries.slice(0, 5);
 }
 
-// Cron için — sadece Tournament Top 5 (address ile)
+// Cron için — sadece Tournament Top 5
 export async function getTop5Tournament(): Promise<LeaderboardEntry[]> {
   return getTop5("tournament");
 }
 
-// Belirli bir oyuncu'nun bu hafta en yüksek scorunu al
+// Belirli bir oyuncunun bu hafta en yüksek skorunu al
 export async function getPlayerBestScore(
   mode: "practice" | "tournament",
   fid: number
 ): Promise<LeaderboardEntry | null> {
-  const kv = await getKV();
+  const redis = getRedis();
   const weekNumber = getWeekNumber();
   const key = `${mode}:week:${weekNumber}:${fid}`;
 
-  const entry = await kv.get<LeaderboardEntry>(key);
+  const entry = await redis.get<LeaderboardEntry>(key);
   return entry || null;
 }
