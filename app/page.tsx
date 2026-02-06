@@ -13,6 +13,13 @@ import { Address, Hex, parseAddress, assertHex } from "@/lib/eth";
 
 type Screen = "menu" | "practice" | "tournament" | "leaderboard";
 
+async function authFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const { token } = await sdk.quickAuth.getToken();
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
+
 export default function Home() {
   const [fid, setFid] = useState<number | null>(null);
   const [address, setAddress] = useState<Address | null>(null);
@@ -33,7 +40,6 @@ export default function Home() {
 
   const [scoreSaved, setScoreSaved] = useState(false);
 
-  // ✅ GameCanvas props için zorunlu alanlar
   const [sessionId, setSessionId] = useState<string>("");
   const [gameStarted, setGameStarted] = useState(false);
 
@@ -81,18 +87,17 @@ export default function Home() {
       setScoreSaved(false);
 
       try {
-        await fetch("/api/save-score", {
+        await authFetch("/api/save-score", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            fid,
             address,
             score: finalScore,
             mergeCount: finalMerges,
             highestLevel: finalHighest,
             mode: currentMode,
             gameLog,
-            sessionId, // ✅ artık state'ten geliyor
+            sessionId,
           }),
         });
         setScoreSaved(true);
@@ -101,7 +106,7 @@ export default function Home() {
         alert("Score could not be saved. Please try again.");
       }
     },
-    [fid, address, currentMode, sessionId]
+    [address, currentMode, sessionId]
   );
 
   const handleCast = useCallback(async () => {
@@ -125,7 +130,6 @@ export default function Home() {
 
   const startGame = useCallback(
     async (mode: "practice" | "tournament") => {
-      // fid olmadan oyun başlatma
       if (!fid) {
         alert("Farcaster context not ready. Please try again.");
         return;
@@ -269,12 +273,11 @@ export default function Home() {
 
           await waitForTransaction(entryTxHash);
 
-          // entry kaydı (şimdilik)
-          await fetch("/api/create-entry", {
+          // ✅ entry kaydı: fid body'den gitmez (server token'dan alır)
+          await authFetch("/api/create-entry", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              fid,
               address: currentAddress,
               mode: "tournament",
             }),
@@ -286,12 +289,14 @@ export default function Home() {
           return;
         }
       } else {
-        // practice entry (şimdilik)
         try {
-          await fetch("/api/create-entry", {
+          await authFetch("/api/create-entry", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ fid, address, mode: "practice" }),
+            body: JSON.stringify({
+              address,
+              mode: "practice",
+            }),
           });
         } catch (e) {
           console.error("Practice entry failed:", e);
@@ -300,7 +305,6 @@ export default function Home() {
         }
       }
 
-      // ✅ yeni oyun başlangıcı
       setGameOver(false);
       setScore(0);
       setMergeCount(0);
