@@ -6,6 +6,21 @@ type VerifiedUser = {
 
 const client = createClient();
 
+function parseFid(sub: unknown): number {
+  if (typeof sub !== "string") {
+    throw new Errors.InvalidTokenError("Invalid token subject");
+  }
+
+  const fid = Number(sub);
+
+  // fid pozitif integer olmalı
+  if (!Number.isInteger(fid) || fid <= 0) {
+    throw new Errors.InvalidTokenError("Invalid fid");
+  }
+
+  return fid;
+}
+
 /**
  * Next.js Route Handler içinde:
  * - Authorization: Bearer <token> header'ını alır
@@ -13,7 +28,8 @@ const client = createClient();
  * - Token'dan fid (sub) döndürür
  */
 export async function requireQuickAuthUser(request: Request): Promise<VerifiedUser> {
-  const authorization = request.headers.get("authorization") || request.headers.get("Authorization");
+  const authorization =
+    request.headers.get("authorization") || request.headers.get("Authorization");
 
   if (!authorization || !authorization.startsWith("Bearer ")) {
     throw new Errors.InvalidTokenError("Missing token");
@@ -21,7 +37,6 @@ export async function requireQuickAuthUser(request: Request): Promise<VerifiedUs
 
   const token = authorization.slice("Bearer ".length).trim();
 
-  // Domain = bu isteğin geldiği host (aud kontrolü için)
   const host =
     request.headers.get("x-forwarded-host") ||
     request.headers.get("host") ||
@@ -32,12 +47,9 @@ export async function requireQuickAuthUser(request: Request): Promise<VerifiedUs
     domain: host,
   });
 
-  return { fid: payload.sub };
+  return { fid: parseFid(payload.sub) };
 }
 
-/**
- * Eğer route içinde "try/catch" ile özel hata mesajı vermek istersen:
- */
 export function isInvalidTokenError(e: unknown): boolean {
   return e instanceof Errors.InvalidTokenError;
 }
