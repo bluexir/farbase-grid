@@ -57,8 +57,15 @@ export async function getTop5(
   const weekNumber = getWeekNumber();
   const pattern = `${mode}:week:${weekNumber}:*`;
 
-  const keys = await redis.keys<string>(pattern);
-  if (!keys || keys.length === 0) return [];
+  // ✅ Upstash redis.keys() generic kabul etmez
+  const rawKeys = await redis.keys(pattern);
+
+  // keys bazen string[] döner, bazen unknown olabilir → normalize ediyoruz
+  const keys: string[] = Array.isArray(rawKeys)
+    ? rawKeys.filter((k): k is string => typeof k === "string")
+    : [];
+
+  if (keys.length === 0) return [];
 
   const entries: LeaderboardEntry[] = [];
   for (const key of keys) {
