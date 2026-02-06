@@ -134,7 +134,7 @@ export default function Home() {
         const USDC_ADDRESS = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
         const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
 
-        const waitForTransaction = async (txHash: string) => {
+        const waitForTransaction = async (txHash: `0x${string}`) => {
           let confirmed = false;
           let attempts = 0;
           while (!confirmed && attempts < 30) {
@@ -173,7 +173,7 @@ export default function Home() {
             to: USDC_ADDRESS,
             data: approveData,
           }],
-        }) as string;
+        }) as `0x${string}`;
 
         await waitForTransaction(approveTxHash);
 
@@ -189,7 +189,7 @@ export default function Home() {
             to: CONTRACT_ADDRESS,
             data: enterData,
           }],
-        }) as string;
+        }) as `0x${string}`;
 
         await waitForTransaction(entryTxHash);
 
