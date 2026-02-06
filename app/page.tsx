@@ -122,6 +122,11 @@ export default function Home() {
         }
       }
 
+      if (!currentAddress) {
+        alert("Wallet not connected");
+        return;
+      }
+
       try {
         const provider = await sdk.wallet.getEthereumProvider();
         if (!provider) throw new Error("No provider");
@@ -169,9 +174,9 @@ export default function Home() {
         const approveTxHash = await provider.request({
           method: "eth_sendTransaction",
           params: [{
-            from: currentAddress,
-            to: USDC_ADDRESS,
-            data: approveData,
+            from: currentAddress as `0x${string}`,
+            to: USDC_ADDRESS as `0x${string}`,
+            data: approveData as `0x${string}`,
           }],
         }) as `0x${string}`;
 
@@ -185,9 +190,9 @@ export default function Home() {
         const entryTxHash = await provider.request({
           method: "eth_sendTransaction",
           params: [{
-            from: currentAddress,
-            to: CONTRACT_ADDRESS,
-            data: enterData,
+            from: currentAddress as `0x${string}`,
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            data: enterData as `0x${string}`,
           }],
         }) as `0x${string}`;
 
