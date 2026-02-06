@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRemainingAttempts } from "@/lib/attempts";
 import { Redis } from "@upstash/redis";
 
+export const dynamic = 'force-dynamic';
+
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
   token: process.env.KV_REST_API_TOKEN!,
@@ -28,7 +30,7 @@ export async function GET(req: NextRequest) {
       const dailyKey = `practice:daily:${fid}:${today}`;
       
       const used = await redis.get<number>(dailyKey) || 0;
-      remaining = Math.max(0, 3 - used);
+      remaining = Math.max(0, 3 - (typeof used === 'number' ? used : 0));
     } else {
       remaining = await getRemainingAttempts(parseInt(fid), mode);
     }
