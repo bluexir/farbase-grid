@@ -9,12 +9,13 @@ import MainMenu from "@/components/MainMenu";
 import Leaderboard from "@/components/Leaderboard";
 import { getCoinByLevel } from "@/lib/coins";
 import { GameLog } from "@/lib/game-log";
+import { Address, Hex, parseAddress, assertHex } from "@/lib/eth";
 
 type Screen = "menu" | "practice" | "tournament" | "leaderboard";
 
 export default function Home() {
   const [fid, setFid] = useState<number | null>(null);
-  const [address, setAddress] = useState<string | null>(null);
+  const [address, setAddress] = useState<Address | null>(null);
   const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState<Screen>("menu");
   const [gameOver, setGameOver] = useState(false);
@@ -22,7 +23,9 @@ export default function Home() {
   const [mergeCount, setMergeCount] = useState(0);
   const [highestLevel, setHighestLevel] = useState(1);
   const [gameKey, setGameKey] = useState(0);
-  const [currentMode, setCurrentMode] = useState<"practice" | "tournament">("practice");
+  const [currentMode, setCurrentMode] = useState<"practice" | "tournament">(
+    "practice"
+  );
   const [scoreSaved, setScoreSaved] = useState(false);
 
   useEffect(() => {
@@ -33,9 +36,11 @@ export default function Home() {
       try {
         const provider = await sdk.wallet.getEthereumProvider();
         if (provider) {
-          const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
+          const accounts = (await provider.request({
+            method: "eth_accounts",
+          })) as string[];
           if (accounts && accounts.length > 0) {
-            setAddress(accounts[0]);
+            setAddress(parseAddress(accounts[0]));
           }
         }
       } catch (e) {
@@ -53,43 +58,49 @@ export default function Home() {
     setHighestLevel((prev) => Math.max(prev, toLevel));
   }, []);
 
-  const handleGameOver = useCallback(async (finalMerges: number, finalHighest: number, gameLog: GameLog) => {
-    setGameOver(true);
-    const coinData = getCoinByLevel(finalHighest);
-    const finalScore = (coinData?.scoreValue || 1) * finalMerges;
-    setScore(finalScore);
-    setMergeCount(finalMerges);
-    setHighestLevel(finalHighest);
-    setScoreSaved(false);
+  const handleGameOver = useCallback(
+    async (finalMerges: number, finalHighest: number, gameLog: GameLog) => {
+      setGameOver(true);
+      const coinData = getCoinByLevel(finalHighest);
+      const finalScore = (coinData?.scoreValue || 1) * finalMerges;
+      setScore(finalScore);
+      setMergeCount(finalMerges);
+      setHighestLevel(finalHighest);
+      setScoreSaved(false);
 
-    try {
-      await fetch("/api/save-score", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fid,
-          address,
-          score: finalScore,
-          mergeCount: finalMerges,
-          highestLevel: finalHighest,
-          mode: currentMode,
-          gameLog,
-          sessionId: `${fid}-${Date.now()}`
-        }),
-      });
-      setScoreSaved(true);
-    } catch (e) {
-      console.error("Failed to save score:", e);
-      alert("Score could not be saved. Please try again.");
-    }
-  }, [fid, address, currentMode]);
+      try {
+        await fetch("/api/save-score", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fid,
+            address,
+            score: finalScore,
+            mergeCount: finalMerges,
+            highestLevel: finalHighest,
+            mode: currentMode,
+            gameLog,
+            sessionId: `${fid}-${Date.now()}`,
+          }),
+        });
+        setScoreSaved(true);
+      } catch (e) {
+        console.error("Failed to save score:", e);
+        alert("Score could not be saved. Please try again.");
+      }
+    },
+    [fid, address, currentMode]
+  );
 
   const handleCast = useCallback(async () => {
     try {
       const coinData = getCoinByLevel(highestLevel);
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://farbase-drop.vercel.app";
-      const text = `🪙 I just scored ${score} points on FarBase Drop! My highest coin reached: ${coinData?.symbol || "DOGE"} 🔥\n\nPlay now: ${appUrl}`;
-      
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL || "https://farbase-drop.vercel.app";
+      const text = `🪙 I just scored ${score} points on FarBase Drop! My highest coin reached: ${
+        coinData?.symbol || "DOGE"
+      } 🔥\n\nPlay now: ${appUrl}`;
+
       await sdk.actions.composeCast({
         text,
         embeds: [appUrl],
@@ -99,139 +110,180 @@ export default function Home() {
     }
   }, [score, highestLevel]);
 
-  const startGame = useCallback(async (mode: "practice" | "tournament") => {
-    if (mode === "tournament") {
-      let currentAddress = address;
+  const startGame = useCallback(
+    async (mode: "practice" | "tournament") => {
+      if (mode === "tournament") {
+        let currentAddress: Address | null = address;
 
-      if (!currentAddress) {
+        if (!currentAddress) {
+          try {
+            const provider = await sdk.wallet.getEthereumProvider();
+            if (provider) {
+              const accounts = (await provider.request({
+                method: "eth_accounts",
+              })) as string[];
+              if (accounts && accounts.length > 0) {
+                const parsed = parseAddress(accounts[0]);
+                if (!parsed) {
+                  alert("Invalid wallet address");
+                  return;
+                }
+                setAddress(parsed);
+                currentAddress = parsed;
+              } else {
+                alert("Wallet not connected");
+                return;
+              }
+            }
+          } catch (e) {
+            alert("Wallet connection failed");
+            return;
+          }
+        }
+
+        if (!currentAddress) {
+          alert("Wallet not connected");
+          return;
+        }
+
         try {
           const provider = await sdk.wallet.getEthereumProvider();
-          if (provider) {
-            const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
-            if (accounts && accounts.length > 0) {
-              setAddress(accounts[0]);
-              currentAddress = accounts[0];
-            } else {
-              alert("Wallet not connected");
-              return;
+          if (!provider) throw new Error("No provider");
+
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x2105" }],
+          });
+
+          const USDC_ADDRESS = parseAddress(
+            process.env.NEXT_PUBLIC_USDC_ADDRESS ??
+              "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+          );
+          const CONTRACT_ADDRESS = parseAddress(
+            process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
+          );
+
+          if (!USDC_ADDRESS) throw new Error("Invalid USDC address");
+          if (!CONTRACT_ADDRESS)
+            throw new Error(
+              "Invalid contract address (NEXT_PUBLIC_CONTRACT_ADDRESS)"
+            );
+
+          const waitForTransaction = async (txHash: Hex) => {
+            let confirmed = false;
+            let attempts = 0;
+            while (!confirmed && attempts < 30) {
+              try {
+                const receipt = (await provider.request({
+                  method: "eth_getTransactionReceipt",
+                  params: [txHash],
+                })) as any;
+
+                if (receipt && receipt.status === "0x1") {
+                  confirmed = true;
+                } else if (receipt && receipt.status === "0x0") {
+                  throw new Error("Transaction failed");
+                } else {
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  attempts++;
+                }
+              } catch (e) {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+                attempts++;
+              }
             }
-          }
+            if (!confirmed) throw new Error("Transaction confirmation timeout");
+          };
+
+          const { ethers } = await import("ethers");
+          const usdcInterface = new ethers.Interface([
+            "function approve(address spender, uint256 amount)",
+          ]);
+          const approveData = assertHex(
+            usdcInterface.encodeFunctionData("approve", [
+              CONTRACT_ADDRESS,
+              1000000,
+            ])
+          );
+
+          const approveTxHash = assertHex(
+            await provider.request({
+              method: "eth_sendTransaction",
+              params: [
+                {
+                  from: currentAddress,
+                  to: USDC_ADDRESS,
+                  data: approveData,
+                },
+              ],
+            })
+          );
+
+          await waitForTransaction(approveTxHash);
+
+          const contractInterface = new ethers.Interface([
+            "function enterTournament(address token)",
+          ]);
+          const enterData = assertHex(
+            contractInterface.encodeFunctionData("enterTournament", [
+              USDC_ADDRESS,
+            ])
+          );
+
+          const entryTxHash = assertHex(
+            await provider.request({
+              method: "eth_sendTransaction",
+              params: [
+                {
+                  from: currentAddress,
+                  to: CONTRACT_ADDRESS,
+                  data: enterData,
+                },
+              ],
+            })
+          );
+
+          await waitForTransaction(entryTxHash);
+
+          await fetch("/api/create-entry", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fid,
+              address: currentAddress,
+              mode: "tournament",
+            }),
+          });
+        } catch (e: any) {
+          console.error("Tournament entry failed:", e);
+          const errorMessage = e?.message || "Transaction failed";
+          alert(`Tournament entry failed: ${errorMessage}`);
+          return;
+        }
+      } else {
+        try {
+          await fetch("/api/create-entry", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fid, address, mode: "practice" }),
+          });
         } catch (e) {
-          alert("Wallet connection failed");
+          console.error("Practice entry failed:", e);
+          alert("Failed to start practice mode");
           return;
         }
       }
 
-      if (!currentAddress) {
-        alert("Wallet not connected");
-        return;
-      }
-
-      try {
-        const provider = await sdk.wallet.getEthereumProvider();
-        if (!provider) throw new Error("No provider");
-
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }], 
-        });
-
-        const USDC_ADDRESS = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-        const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
-
-        const waitForTransaction = async (txHash: `0x${string}`) => {
-          let confirmed = false;
-          let attempts = 0;
-          while (!confirmed && attempts < 30) {
-            try {
-              const receipt = await provider.request({
-                method: "eth_getTransactionReceipt",
-                params: [txHash],
-              }) as any;
-              
-              if (receipt && receipt.status === "0x1") {
-                confirmed = true;
-              } else if (receipt && receipt.status === "0x0") {
-                throw new Error("Transaction failed");
-              } else {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                attempts++;
-              }
-            } catch (e) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              attempts++;
-            }
-          }
-          if (!confirmed) throw new Error("Transaction confirmation timeout");
-        };
-
-        const { ethers } = await import("ethers");
-        const usdcInterface = new ethers.Interface([
-          "function approve(address spender, uint256 amount)"
-        ]);
-        const approveData = usdcInterface.encodeFunctionData("approve", [CONTRACT_ADDRESS, 1000000]);
-
-        const approveTxHash = await provider.request({
-          method: "eth_sendTransaction",
-          params: [{
-            from: currentAddress as `0x${string}`,
-            to: USDC_ADDRESS as `0x${string}`,
-            data: approveData as `0x${string}`,
-          }],
-        }) as `0x${string}`;
-
-        await waitForTransaction(approveTxHash);
-
-        const contractInterface = new ethers.Interface([
-          "function enterTournament(address token)"
-        ]);
-        const enterData = contractInterface.encodeFunctionData("enterTournament", [USDC_ADDRESS]);
-
-        const entryTxHash = await provider.request({
-          method: "eth_sendTransaction",
-          params: [{
-            from: currentAddress as `0x${string}`,
-            to: CONTRACT_ADDRESS as `0x${string}`,
-            data: enterData as `0x${string}`,
-          }],
-        }) as `0x${string}`;
-
-        await waitForTransaction(entryTxHash);
-
-        await fetch("/api/create-entry", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fid, address: currentAddress, mode: "tournament" }),
-        });
-
-      } catch (e: any) {
-        console.error("Tournament entry failed:", e);
-        const errorMessage = e?.message || "Transaction failed";
-        alert(`Tournament entry failed: ${errorMessage}`);
-        return;
-      }
-    } else {
-      try {
-        await fetch("/api/create-entry", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fid, address, mode: "practice" }),
-        });
-      } catch (e) {
-        console.error("Practice entry failed:", e);
-        alert("Failed to start practice mode");
-        return;
-      }
-    }
-
-    setGameOver(false);
-    setScore(0);
-    setMergeCount(0);
-    setHighestLevel(1);
-    setCurrentMode(mode);
-    setScreen(mode);
-    setGameKey((prev) => prev + 1);
-  }, [address, fid]);
+      setGameOver(false);
+      setScore(0);
+      setMergeCount(0);
+      setHighestLevel(1);
+      setCurrentMode(mode);
+      setScreen(mode);
+      setGameKey((prev) => prev + 1);
+    },
+    [address, fid]
+  );
 
   const restartGame = useCallback(() => {
     setGameOver(false);
@@ -287,79 +339,29 @@ export default function Home() {
   }
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100%",
-        background: "#000",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "424px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px 0 12px",
-        }}
-      >
-        <button
-          onClick={() => setScreen("menu")}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#00f3ff",
-            fontSize: "0.75rem",
-            cursor: "pointer",
-          }}
-        >
-          ← Menu
-        </button>
-        <span
-          style={{
-            color: currentMode === "tournament" ? "#ff00ff" : "#00f3ff",
-            fontSize: "0.7rem",
-            fontWeight: "bold",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-          }}
-        >
-          {currentMode === "tournament" ? "🏆 Tournament" : "🎮 Practice"}
-        </span>
-        <div style={{ width: "50px" }} />
-      </div>
-
-      <div style={{ width: "100%", maxWidth: "424px" }}>
-        <Scoreboard score={liveScore} mergeCount={mergeCount} highestLevel={highestLevel} />
-      </div>
-
-      <div style={{ position: "relative", width: "424px", flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
-        <GameCanvas
-          key={gameKey}
-          onMerge={handleMerge}
-          onGameOver={handleGameOver}
-          gameStarted={true}
-          fid={fid!}
-          mode={currentMode}
-          sessionId={`${fid}-${Date.now()}`}
-        />
-
-        {gameOver && (
-          <GameOver
-            score={score}
-            mergeCount={mergeCount}
-            highestLevel={highestLevel}
-            onRestart={restartGame}
-            onCast={handleCast}
-            scoreSaved={scoreSaved}
+    <div className="flex flex-col items-center justify-center w-full min-h-screen bg-black text-white">
+      {!gameOver ? (
+        <>
+          <Scoreboard score={liveScore} highestLevel={highestLevel} />
+          <GameCanvas
+            key={gameKey}
+            mode={currentMode}
+            onMerge={handleMerge}
+            onGameOver={handleGameOver}
           />
-        )}
-      </div>
+        </>
+      ) : (
+        <GameOver
+          score={score}
+          merges={mergeCount}
+          highestLevel={highestLevel}
+          scoreSaved={scoreSaved}
+          mode={currentMode}
+          onRestart={restartGame}
+          onMenu={() => setScreen("menu")}
+          onCast={handleCast}
+        />
+      )}
     </div>
   );
 }
